@@ -129,16 +129,14 @@ For each metric, rank the top-K candidates of the same target onto a `[0, 1]` sc
 
 **Step 2 — Chemistry score**
 
-\[
-G_i = 0.5 \cdot r(\Delta SA)_i + 0.5 \cdot r(\Delta SC)_i
-\]
-
+```text
+G_i = 0.5 · r(ΔSA)_i + 0.5 · r(ΔSC)_i
+```
 **Step 3 — Final score (hybrid)**
 
-\[
-S_i = (1 - \alpha)\, r(model\_p)_i + \alpha\, G_i
-\]
-
+```text
+S_i = (1 - α) · r(model_p)_i + α · G_i
+```
 The MVP uses `α = 0.3` (favor the model; metrics only adjust lightly).  
 The output still **keeps raw metrics** in JSON for chemists to inspect; `S_i` is used only for the default sort order.
 

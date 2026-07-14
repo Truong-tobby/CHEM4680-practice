@@ -158,7 +158,7 @@ RAG uses **two separate retrievers**:
 
 ### B) Literature retriever (text)
 
-- Corpus: 50–100 papers/reviews (expand gradually to ~550 following the professor’s suggestion)
+- Corpus: 50–100 papers/reviews 
 - Query: reaction class + keywords (“amide coupling”, “Suzuki”, “protecting group”…)
 - Output: top-k chunks with DOI + quote
 

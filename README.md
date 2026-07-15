@@ -118,7 +118,7 @@ You can combine `query.bibliographic`, `filter=from-pub-date:2018` to filter rec
 
 Optionally keep in parallel:
 
-- `data/metadata/<id>.json` — full per-paper copy (debug / audit)
+- `data/metadata.json` — all paper metadata in one JSON array (debug / audit)
 - `data/fulltext/<id>.txt` — cleaned abstract, or intro if TDM download succeeds
 
 ### 1.5 Full-text (optional, later phase)

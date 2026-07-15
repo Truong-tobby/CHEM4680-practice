@@ -1,203 +1,277 @@
-# Metrics + RAG to evaluate single-step retrosynthesis
+# Retrosynthesis Metrics Literature RAG Explorer
 
-> **Topic:** We take the output of a single-step retrosynthesis model (multiple reaction proposals), then compute SA score and SC score. We then use RAG to retrieve information from papers to determine which proposals are supported by prior literature. The output is a JSON file containing scores for each reaction proposal, literature evidence, etc.
-
----
-
-# Part 1 — Motivation (Why?)
-
-## 1.1 Current problem
-
-A **single-step model** proposes many bond disconnections (precursors) for a target.
-
-Issues:
-
-- The model proposes **many** candidates but **does not explain** why one step is better than another.
-- **Chemistry metrics** (SA, SC) usually live only in papers / search code and are **not turned into a narrative** for chemists.
-- **Chemical plausibility** analysis is still mostly **manual**.
-
-## 1.2 Core idea
-
-Build an **assistant**:
-
-> **Input** = target from a published model ([higherlev_retro repository](https://github.com/jihye-roh/higherlev_retro)) + single-step proposals  
-> **Output** = ranked table with **metric scores** + **justification with citations**
-
-Using the ranking, metric scores, as well as yield and reaction conditions in the aggregated output file, users can choose a synthesis route that fits their lab’s actual experimental constraints.
+> **Goal:** Build a small system to (1) automatically search and download paper metadata on *retrosynthesis metrics* via Crossref, (2) store them as a structured mini-corpus, and (3) use RAG for Q&A on metric definitions and comparisons.
 
 ---
 
-# Part 2 — Project goals
-
-## 2.1 Main goals
-
-1. Call the single-step model → obtain top-K precursors.
-2. Compute metrics for each reaction proposal.
-3. Use RAG to:
-   - find similar USPTO reactions,
-   - find relevant literature passages,
-   - generate explanations **only from retrieved evidence**.
-4. Export a ranked table + verdict + sources.
-
----
-
-# Part 3 — High-level architecture (3 blocks)
+## High-level architecture
 
 ```text
-[Target SMILES]
-       │
-       ▼
-┌──────────────────────┐
-│ Block 1: Single-step │  → top-K candidates
-└──────────────────────┘
-       │
-       ▼
-┌──────────────────────┐
-│ Block 2: Metrics     │  → score table (model_p, SA, SC)
-└──────────────────────┘
-       │
-       ▼
-┌──────────────────────┐
-│ Block 3: RAG         │  → similar reactions + literature
-│  Retriever + LLM     │  → justification + citations
-└──────────────────────┘
-       │
-       ▼
-[Ranked table + grounded explanation]
+┌──────────────────────────────────────────────────────────────┐
+│  Part 1 — Literature Data Mining (Crossref)                  │
+│  query keywords → /works → metadata + TDM links             │
+│  → data/papers.jsonl  (+ optional fulltext chunks)           │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Part 2 — RAG Q&A                                            │
+│  index (title+abstract+keywords) → retrieve top-k → LLM      │
+│  → answer + DOI evidence list                                │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Part 3 — Metric Explorer (optional)                         │
+│  metric name → RAG definition + formula + context            │
+│  (optional) try top-k / coverage on a toy subset             │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+**User flow:**
+
+1. User enters a question (Vietnamese or English).
+2. Retriever finds 3–5 relevant papers from `papers.jsonl`.
+3. LLM reads retrieved abstract/intro → generates a grounded answer.
+4. UI/CLI also shows DOI evidence for further reading.
 
 ---
 
-# Part 4 — Block details
+## Part 1 — Literature data mining / downloader
 
-## 4.1 Block 1 — Single-step proposals
+### 1.1 Data source: Crossref REST API
 
-**Input:** target SMILES  
-**Output:** list of candidates  
-**Model use:** Download and extract the one-step model
+Use the `/works` endpoint to find papers and fetch metadata (no API key required; send a polite `User-Agent` with a contact email).
 
-Download the [`uspto_original_consol.mar` file](https://hkustconnect-my.sharepoint.com/:u:/g/personal/ztanaj_connect_ust_hk/IQD3QJWNq_prQppG2VtJLTDRAYRK4WIuLVGXSx9WK9a3Bz4?e=1z5MeS) on OneDrive — the USPTO full consolidated one-step model from the [higherlev_retro repository](https://github.com/jihye-roh/higherlev_retro). The `.mar` file is a zip archive; extract it with:
+**Search by keyword:**
 
-```bash
-unzip uspto_original_consol.mar -d tree_search/uspto_original_consol_Roh
+```http
+GET https://api.crossref.org/works?query=retrosynthesis%20metrics&rows=20
 ```
 
-This unpacks the model files into `tree_search/uspto_original_consol_Roh/`. After extraction it should contain at least:
+**Metadata for a specific DOI:**
 
-- `model_latest.pt` — the trained model weights
-- `templates.jsonl` — template library
-- `models.py` — model architecture definitions
-- `utils.py` — model utilities
-
-> **Note:** The loader passes `weights_only=False` to `torch.load` automatically, which this checkpoint requires on PyTorch ≥ 2.6.
-
-Example (illustrative):
-
-```text
-Target T:
-  CC(C)c1ccc(-n2nc(O)c3c(=O)c4ccc(Cl)cc4[nH]c3c2=O)cc1
-
-Candidate 1:  A.B  >> T     (model_p = 0.91)
-Candidate 2:  C.D  >> T     (model_p = 0.84)
-Candidate 3:  E.F  >> T     (model_p = 0.72)
-...
-Candidate K:  ...           (K = 10 in the MVP)
+```http
+GET https://api.crossref.org/works/10.1039/C9SC05704H
 ```
 
----
+**Reduce payload** with `select` (fetch only needed fields):
 
-## 4.2 Block 2 — Metrics
-
-For each reaction proposal, compute the following metrics:
-
-| Metric | Short meaning | Used for | Link |
-|--------|---------------|----------|------|
-| `model_p` | Confidence of the one-step model | ML prior | — |
-| `SA_score` | Synthetic accessibility | Prefer easier-to-synthesize precursors (~1–10; lower = easier) | [Ertl et al.](https://link.springer.com/article/10.1186/1758-2946-1-8) |
-| `SC_score` | Synthetic complexity | Complexity learned from a reaction corpus (~1–5; lower = less complex) | [Coley scscore](https://github.com/connorcoley/scscore) |
-
-### 4.2.1 Ranking rule (MVP)
-
-Each candidate `i` has three signals:
-
-- `model_p`: one-step model confidence (higher = better)
-- `ΔSA`: SA reduction from target → precursor (higher = better accessibility)
-- `ΔSC`: SC reduction likewise (higher = better complexity reduction)
-
-**Step 1 — Normalize within the same target**  
-For each metric, rank the top-K candidates of the same target onto a `[0, 1]` scale (rank 1 = best for that metric).
-
-**Step 2 — Chemistry score**
-
-```text
-G_i = 0.5 · r(ΔSA)_i + 0.5 · r(ΔSC)_i
+```http
+GET https://api.crossref.org/works?query=round-trip%20accuracy%20retrosynthesis&rows=20&select=DOI,title,author,published,container-title,abstract,link,subject
 ```
-**Step 3 — Final score (hybrid)**
 
-```text
-S_i = (1 - α) · r(model_p)_i + α · G_i
+### 1.2 Suggested query set (metrics-focused)
+
+Replace or supplement old reaction-class queries with a set focused on **retrosynthesis evaluation**:
+
+```python
+SEARCH_QUERIES = [
+    "single-step retrosynthesis",
+    "round-trip accuracy retrosynthesis",
+    "retrosynthesis coverage diversity",
+    "PaRoutes retrosynthesis",
+    "retrosynthesis benchmarking",
+    "retrosynthesis route metrics",
+    "failure modes one-step retrosynthesis",
+    "computer-aided synthesis planning evaluation",
+    "multi-step retrosynthesis evaluation metrics",
+    "synthetic accessibility score retrosynthesis",
+]
 ```
-The MVP uses `α = 0.3` (favor the model; metrics only adjust lightly).  
-The output still **keeps raw metrics** in JSON for chemists to inspect; `S_i` is used only for the default sort order.
 
-Post-MVP ablation: `α ∈ {0, 0.3, 0.5}` and compare against ranking by `model_p` alone.
+You can combine `query.bibliographic`, `filter=from-pub-date:2018` to filter recent years, or start from seed DOIs and expand via citations (later phase).
 
-> **Pitch:** The model prior is primary; SA/SC only lightly re-rank within top-K and do not replace the model. Ranking ≠ final decision — RAG still provides explanation / citation.
+### 1.3 Metadata fields to store
 
----
+| Field | Crossref source (suggested) | Notes |
+| ----- | --------------------------- | ----- |
+| `doi` | `DOI` | Normalize to lowercase |
+| `title` | `title[0]` | |
+| `authors` | `author[].given` + `family` | List of strings |
+| `year` | `published-print` / `published-online` / `created` | Use the first available year |
+| `journal` | `container-title[0]` | |
+| `abstract` | `abstract` | Often JATS XML → strip tags |
+| `link` | `link[]` | Prefer URL with `intended-application` = TDM / `unspecified` |
+| `keywords` | assign from query + `subject` | |
+| `tags` | rule-based or lightweight LLM | e.g. `single-step metrics`, `route metrics`, `failure modes` |
 
-## 4.3 Block 3 — RAG (core of the project)
-
-RAG uses **two separate retrievers**:
-
-### A) Reaction retriever (chemistry)
-
-- Corpus: USPTO subset (e.g., 50k–200k reactions)
-- Query: reaction SMILES / fingerprint of the candidate
-- Output: top-k similar reactions + IDs
-
-### B) Literature retriever (text)
-
-- Corpus: 50–100 papers/reviews 
-- Query: reaction class + keywords (“amide coupling”, “Suzuki”, “protecting group”…)
-- Output: top-k chunks with DOI + quote
-
-### C) LLM grounded generation
-
-The prompt may use only:
-
-1. candidate + metrics  
-2. similar USPTO reactions  
-3. literature quotes  
-
-If evidence is missing → return `uncertain` / `insufficient evidence` — **do not hallucinate**.
-
----
-
-## Appendix — Output JSON schema
+### 1.4 JSON schema per paper
 
 ```json
 {
-  "target": "SMILES",
-  "candidates": [
+  "doi": "10.1039/c9sc05704h",
+  "title": "Predicting retrosynthetic pathways using transformer-based models and a hyper-graph exploration strategy",
+  "authors": ["Philippe Schwaller", "..."],
+  "year": 2020,
+  "journal": "Chemical Science",
+  "abstract": "...",
+  "link": "https://...",
+  "keywords": ["round-trip", "retrosynthesis", "transformer"],
+  "tags": ["single-step metrics", "route metrics"],
+  "source": "crossref",
+  "query_hit": "round-trip accuracy retrosynthesis"
+}
+```
+
+**Primary output:** `data/papers.jsonl` — one record per line (easy to stream when building an index).
+
+Optionally keep in parallel:
+
+- `data/metadata/<id>.json` — full per-paper copy (debug / audit)
+- `data/fulltext/<id>.txt` — cleaned abstract, or intro if TDM download succeeds
+
+### 1.5 Full-text (optional, later phase)
+
+1. From Crossref `link[]`, choose a URL intended for **text and data mining** (TDM).
+2. `requests.get` PDF/HTML with headers appropriate for license/TDM.
+3. Extract text with `pdfminer.six` or Grobid.
+4. **For learning MVP:** **title + abstract (+ keywords)** is enough — reduces copyright risk and PDF complexity.
+
+### 1.6 Module 1 implementation pipeline
+
+```text
+config.py          → queries, paths, User-Agent, rate limit
+crossref_client.py → search_works(query), get_work(doi), parse_item()
+tagger.py          → assign tags/keywords by rule (keyword hit → tag)
+corpus_builder.py  → merge dedupe by DOI → papers.jsonl
+downloader.py      → (optional) TDM fetch + extract text
+__main__.py        → CLI: search | build-corpus | fetch-doi
+```
+
+**Target CLI:**
+
+```bash
+# Search + save metadata
+python -m literature_mining --source crossref --query "PaRoutes" --rows 20
+
+# Run all SEARCH_QUERIES → data/papers.jsonl
+python -m literature_mining --source crossref --build-corpus
+
+# Fetch one specific DOI (seed paper)
+python -m literature_mining --doi 10.1039/C9SC05704H
+```
+
+**Technical requirements:**
+
+- Rate-limit ~1 request/second; retry on HTTP 429.
+- Deduplicate by DOI.
+- Idempotent: re-runs skip DOIs already in `papers.jsonl`.
+- Log counts of new / skip / error papers.
+
+
+## Part 2 — RAG Q&A on retrosynthesis metrics
+
+### 2.1 Build index from corpus
+
+For each record in `papers.jsonl`:
+
+```text
+document_text = title + "\n" + abstract + "\n" + " ".join(keywords + tags)
+```
+
+| Retriever | When to use | Dependency |
+| --------- | ----------- | ---------- |
+| **BM25** (`rank-bm25`) | MVP, no GPU, small corpus | Already in `requirements.txt` |
+| **Embedding** (E5 / MiniLM + FAISS or numpy cosine) | When better semantic match is needed | Add later if needed |
+
+A few dozen to a few hundred docs → runs on Colab or a laptop.
+
+### 2.2 Supported question types
+
+| Category | Example |
+| -------- | ------- |
+| Metric definition | “How is round-trip accuracy defined across different papers?” |
+| Paper comparison | “How does round-trip differ between Schwaller 2019/2020 and later papers?” |
+| Benchmark framework | “Which route-level metrics does PaRoutes use?” |
+| Failure modes | “How are failure modes of single-step models categorized in *Quantifying the Failure Modes…*?” |
+| Metric scope | “Are coverage / class diversity used for single-step or multi-step evaluation?” |
+
+### 2.3 Detailed RAG flow
+
+```text
+Question
+   │
+   ▼
+[Retriever]  top_k = 3..5 papers  (score + doi + snippet)
+   │
+   ▼
+[Prompt builder]
+   system: use only provided evidence; state clearly if information is missing
+   user: question + retrieved abstract/title/keyword snippets + DOI
+   │
+   ▼
+[LLM]  → answer (summarize definitions, compare A/B if available)
+       → evidence: [{doi, title, year, relevance}]
+```
+
+**Generation principles:**
+
+- Summarize in your own words; avoid long verbatim copies from abstracts.
+- Attach a DOI to each claim when possible.
+- If the corpus is insufficient → answer “insufficient evidence in corpus” instead of hallucinating.
+
+### 2.4 Module 2 implementation pipeline
+
+```text
+rag/
+  corpus.py       → load papers.jsonl, build docs
+  retriever.py    → PaperRetriever (BM25; optional embedding)
+  prompt.py       → Q&A + metric-card templates
+  generator.py    → call LLM (OpenAI / local / Colab)
+  pipeline.py     → ask(question) → {answer, evidence}
+```
+
+**Target CLI:**
+
+```bash
+python -m rag.pipeline --question "What is round-trip accuracy in retrosynthesis?"
+python -m rag.pipeline --question "PaRoutes route-level metrics?" --top-k 5
+```
+
+**Suggested output schema:**
+
+```json
+{
+  "question": "How is round-trip accuracy defined?",
+  "answer": "...",
+  "evidence": [
     {
-      "id": 1,
-      "reaction": "A.B>>T",
-      "metrics": {
-        "model_p": 0.88,
-        "sa_score": 1.2,
-        "sc_score": 0.72
-      },
-      "rag": {
-        "verdict": "accept",
-        "condition": "...",
-        "yield": ["..."],
-        "sources": [
-          {"type": "uspto", "id": "xx123", "similarity": 0.94},
-          {"type": "doi", "id": "10.xxxx/yyy", "quote": "..."}
-        ]
-      }
+      "doi": "10.1039/c9sc05704h",
+      "title": "...",
+      "year": 2020,
+      "score": 12.4,
+      "snippet": "first 300 chars of abstract..."
     }
   ]
 }
+```
+
+If `rag/retriever.py` already has `ReactionRetriever` for USPTO — **add** a `PaperRetriever` class in parallel; merging both corpora is not required for the literature MVP.
+
+---
+
+## Part 3 — Retrosynthesis metrics
+
+Goal: the assistant not only retrieves papers but also **explains a metric by name** in a structured way.
+
+### 3.1 Metric card (RAG + LLM)
+
+User enters a metric name, e.g.: `round-trip`, `coverage`, `class diversity`, `route solvability`, `LISAS`, `inverse efficiency score`.
+
+Pipeline:
+
+1. Query retriever with metric name (+ synonyms).
+2. LLM generates a **metric card**:
+
+| Section | Content |
+| ------- | ------- |
+| Definition | Short paraphrase, no long copying |
+| Formula | Normalized form (if stated in papers) |
+| Context | single-step vs multi-step / route-level |
+| Source papers | DOI list |
+| Notes | limitations, related failure modes (if any) |
+
+```bash
+python -m rag.pipeline --metric "round-trip accuracy"
 ```

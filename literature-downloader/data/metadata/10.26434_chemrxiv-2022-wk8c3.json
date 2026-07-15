@@ -1,0 +1,27 @@
+{
+  "doi": "10.26434/chemrxiv-2022-wk8c3",
+  "title": "PaRoutes: a framework for benchmarking retrosynthesis route predictions",
+  "authors": [
+    "Samuel Genheden",
+    "Esben Bjerrum"
+  ],
+  "year": 2022,
+  "journal": "",
+  "abstract": "We introduce a framework for benchmarking multi-step retrosynthesis methods, i.e. route predictions, called PaRoutes. The framework consists of two sets of 10,000 synthetic routes extracted from the patent literature, a list of stock compounds, and a curated set of reactions on which one-step retrosynthesis models can be trained. PaRoutes also comes with scripts to compute route quality and route diversity quantities that are important for comparing methods. We use the PaRoute framework to compare three methods implemented in the AiZynthFinder software: Monte Carlo tree search (MCTS), Retro*, and a depth-first proof-number search (DFPN) algorithm, all using a template-based one-step retrosynthesis model. It is found that DFPN is inferior to both MCTS and Retro* and cannot be recommended in its current implementation. MCTS and Retro* are on a par with regard to search speed and the ability to find routes in which all starting material is in stock. However, MCTS outperforms Retro* when it comes to route quality and route diversity. MCTS more easily recovers the reference routes and tends to find a diverse set of solutions for a greater portion of the targets. We encourage practitioners and developers to benchmark their algorithms using PaRoutes and we envisage that the framework will become the community standard to compare retrosynthesis route predictions. It is available at https://github.com/MolecularAI/PaRoutes",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv-2022-wk8c3",
+  "keywords": [
+    "PaRoutes retrosynthesis",
+    "benchmarking",
+    "coverage diversity",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "coverage diversity",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "PaRoutes retrosynthesis"
+}

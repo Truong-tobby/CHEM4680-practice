@@ -1,0 +1,21 @@
+{
+  "doi": "10.1051/shsconf/202317403002",
+  "title": "Synthetic Route Proposal for Cleistanthol Based on Retrosynthesis Approach",
+  "authors": [
+    "Zhifei Liu",
+    "Yichen Li"
+  ],
+  "year": 2023,
+  "journal": "SHS Web of Conferences",
+  "abstract": "Cleistanthol of the diterpenoid group is a newly isolated naturally-occuring molecule of biological and pharmaceutical significance. The molecule contians three ring structures, only one of them aromatic, and hydroxy- and hydrocarbon- substitution groups modifying these rings. However, for this compound, a synthetic method has not yet been proposed for it and similar structures sharing the common ring structure but different sites and contents of modifying groups. This paper focuses on the construction of this molecule based on a reverse analysis from a retrosynthetic approach, and analyzed the advantages, shortcomings, and probable future advancements and improvements possibly being made to the route. This study also investigates its synthesis from a biological oriented approach given the target molecule’s likely medical application, and discussed certain aspects during the synthetic pathway possibly hindering its use and possible circumvention to be introduced.",
+  "link": "https://www.shs-conferences.org/10.1051/shsconf/202317403002/pdf",
+  "keywords": [
+    "retrosynthesis route metrics",
+    "route metrics"
+  ],
+  "tags": [
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "retrosynthesis route metrics"
+}

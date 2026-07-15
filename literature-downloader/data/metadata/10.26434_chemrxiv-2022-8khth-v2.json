@@ -1,0 +1,21 @@
+{
+  "doi": "10.26434/chemrxiv-2022-8khth-v2",
+  "title": "Multistep retrosynthesis combining a disconnection aware triple transformer loop with a route penalty score guided tree search",
+  "authors": [
+    "David Kreutter",
+    "Jean-Louis Reymond"
+  ],
+  "year": 2023,
+  "journal": "",
+  "abstract": "Computer-aided synthesis planning (CASP) aims to automatically learn organic reactivity from literature and perform retrosynthesis of unseen molecules. CASP systems must learn reactions sufficiently precisely to propose realistic disconnections while avoiding overfitting to leave room for diverse options, and explore possible routes such as to allow short synthetic sequences to emerge. Herein we report an open-source CASP tool proposing original solutions to both challenges. First, we use a triple transformer loop (TTL) predicting starting materials (T1), reagents (T2), and products (T3) to explore various disconnections sites defined by combining exhaustive, template-based and transformer-based tagging procedures. Second, we integrate TTL into a multistep tree search algorithm (TTLA) prioritizing sequences using a route penalty score (RPScore) considering the number of steps, their confidence score, and the simplicity of all intermediates along the route. Our approach favours short synthetic routes to commercial starting materials, as exemplified by retrosynthetic analyses of recently approved drugs.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv-2022-8khth-v2",
+  "keywords": [
+    "retrosynthesis route metrics",
+    "route metrics"
+  ],
+  "tags": [
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "retrosynthesis route metrics"
+}

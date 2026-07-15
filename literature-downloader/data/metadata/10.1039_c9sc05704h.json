@@ -1,0 +1,28 @@
+{
+  "doi": "10.1039/c9sc05704h",
+  "title": "Predicting retrosynthetic pathways using transformer-based models and a hyper-graph exploration strategy",
+  "authors": [
+    "Philippe Schwaller",
+    "Riccardo Petraglia",
+    "Valerio Zullo",
+    "Vishnu H. Nair",
+    "Rico Andreas Haeuselmann",
+    "Riccardo Pisoni",
+    "Costas Bekas",
+    "Anna Iuliano",
+    "Teodoro Laino"
+  ],
+  "year": 2020,
+  "journal": "Chemical Science",
+  "abstract": "We present an extension of our Molecular Transformer model combined with a hyper-graph exploration strategy for automatic retrosynthesis route planning without human intervention.",
+  "link": "http://pubs.rsc.org/en/content/articlepdf/2020/SC/C9SC05704H",
+  "keywords": [
+    "doi:10.1039/c9sc05704h",
+    "route metrics"
+  ],
+  "tags": [
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "doi:10.1039/c9sc05704h"
+}

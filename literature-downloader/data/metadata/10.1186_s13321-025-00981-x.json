@@ -1,0 +1,28 @@
+{
+  "doi": "10.1186/s13321-025-00981-x",
+  "title": "Generating diversity and securing completeness in algorithmic retrosynthesis",
+  "authors": [
+    "Florian Mrugalla",
+    "Christopher Franz",
+    "Yannic Alber",
+    "Georg Mogk",
+    "Martín Villalba",
+    "Thomas Mrziglod",
+    "Kevin Schewior"
+  ],
+  "year": 2025,
+  "journal": "Journal of Cheminformatics",
+  "abstract": "Abstract Chemical synthesis planning has considerably benefited from advances in the field of machine learning. Neural networks can reliably and accurately predict reactions leading to a given, possibly complex, molecule. In this work we focus on algorithms for assembling such predictions to a full synthesis plan that, starting from simple building blocks, produces a given target molecule, a procedure known as retrosynthesis. Objective functions for this task are hard to define and context-specific. In order to generate a diverse set of synthesis plans for chemists to select from, we capture the concept of diversity in a novel chemical diversity score (CDS). Our experiments show that our algorithm outperforms the algorithm predominantly employed in this domain, Monte-Carlo Tree Search, with respect to diversity in terms of our score as well as time efficiency. Scientific Contribution: We adapt Depth-First Proof-Number Search (DFPN) (Please refer to https://github.com/Bayer-Group/bayer-retrosynthesis-search for the accompanying source code.) and its variants, which have been applied to retrosynthesis before, to produce a set of solutions, with an explicit focus on diversity. We also make progress on understanding DFPN in terms of completeness, i.e., the ability to find a solution whenever there exists one. DFPN is known to be incomplete, for which we provide a much cleaner example, but we also show that it is complete when reinforced with a threshold-controlling routine from the literature.",
+  "link": "https://link.springer.com/content/pdf/10.1186/s13321-025-00981-x.pdf",
+  "keywords": [
+    "retrosynthesis coverage diversity",
+    "coverage diversity",
+    "route metrics"
+  ],
+  "tags": [
+    "coverage diversity",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "retrosynthesis coverage diversity"
+}

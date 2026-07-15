@@ -1,0 +1,30 @@
+{
+  "doi": "10.26434/chemrxiv-2023-685jv",
+  "title": "Do Chemformers dream of organic matter? Evaluating a transformer model for multi-step retrosynthesis",
+  "authors": [
+    "Annie M. Westerlund",
+    "Siva Manohar Koki",
+    "Supriya Kancharla",
+    "Alessandro Tibo",
+    "Lakshidaa Saigiridharan",
+    "Rocío Mercado",
+    "Samuel Genheden"
+  ],
+  "year": 2023,
+  "journal": "",
+  "abstract": "Synthesis planning of new pharmaceutical compounds is a well-known bottleneck in modern drug design. Template-free methods, such as transformers, have recently been proposed as an alternative to template-based methods for single-step retrosynthetic predictions. Here, we trained and evaluated a transformer model, called Chemformer, for retrosynthesis predictions within drug discovery. The proprietary dataset used for training comprised ~18M reactions from literature, patents, and electronic lab notebooks. Chemformer was evaluated for the purpose of both single-step and multi-step retrosynthesis. We found that the single-step performance of Chemformer was especially good on reaction classes common in drug discovery, with most reaction classes showing a top-10 round-trip accuracy above 0.97. Moreover, Chemformer reached a higher round-trip accuracy compared to a template-based model. By analyzing multi-step retrosynthesis experiments, we observed that Chemformer found synthetic routes leading to commercial starting materials for 95% of the target compounds, an increase by more than 20% compared to the template-based model. In addition to this, we discovered that Chemformer suggested novel disconnections corresponding to reaction templates which are not included in the template-based model. The conclusions drawn from this work allow for designing a synthesis planning tool where template-based and template-free models work in harmony to optimize retrosynthetic recommendations.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv-2023-685jv",
+  "keywords": [
+    "multi-step retrosynthesis evaluation metrics",
+    "benchmarking",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "multi-step retrosynthesis evaluation metrics"
+}

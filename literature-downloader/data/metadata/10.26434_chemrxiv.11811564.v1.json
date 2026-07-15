@@ -1,0 +1,29 @@
+{
+  "doi": "10.26434/chemrxiv.11811564.v1",
+  "title": "Data Augmentation and Pretraining for Template-Based Retrosynthetic Prediction in Computer-Aided Synthesis Planning",
+  "authors": [
+    "Michael Fortunato",
+    "Connor W. Coley",
+    "Brian Barnes",
+    "Klavs F. Jensen"
+  ],
+  "year": 2020,
+  "journal": "",
+  "abstract": "This work presents efforts to augment the performance of data-driven machine learning algorithms for reaction template recommendation used in computer-aided synthesis planning software. Often, machine learning models designed to perform the task of prioritizing reaction templates or molecular transformations are focused on reporting high accuracy metrics for the one-to-one mapping of product molecules in reaction databases to the template extracted from the recorded reaction. The available templates that get selected for inclusion in these machine learning models have been previously limited to those that appear frequently in the reaction databases and exclude potentially useful transformations. By augmenting open-access datasets of organic reactions with artificially calculated template applicability and pretraining a template relevance neural network on this augmented applicability dataset, we report an increase in the template applicability recall and an increase in the diversity of predicted precursors. The augmentation and pretraining effectively teaches the neural network an increased set of templates that could theoretically lead to successful reactions for a given target. Even on a small dataset of well curated reactions, the data augmentation and pretraining methods resulted in an increase in top-1 accuracy, especially for rare templates, indicating these strategies can be very useful for small datasets.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv.11811564.v1",
+  "keywords": [
+    "computer-aided synthesis planning evaluation",
+    "benchmarking",
+    "coverage diversity",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "coverage diversity",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "computer-aided synthesis planning evaluation"
+}

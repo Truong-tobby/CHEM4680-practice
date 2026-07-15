@@ -1,0 +1,26 @@
+{
+  "doi": "10.26434/chemrxiv.13386092.v1",
+  "title": "AI-Driven Synthetic Route Design with Retrosynthesis Knowledge",
+  "authors": [
+    "Shoichi Ishida",
+    "Kei Terayama",
+    "Ryosuke Kojima",
+    "Kiyosei Takasu",
+    "Yasushi Okuno"
+  ],
+  "year": 2020,
+  "journal": "",
+  "abstract": "Computer-aided synthesis planning (CASP) aims to assist chemists in performing retrosynthetic analysis for which they exploit their experiments, intuition, and knowledge. Recent breakthroughs in machine learning techniques, including deep neural networks, have significantly improved data-driven synthetic route designs without human interventions. However, such CASP applications are yet to incorporate retrosynthesis knowledge sufficiently into their algorithms to reflect chemists' way of thinking flexibly. In this study, we developed a hybrid CASP application of data-driven techniques and various retrosynthesis knowledge called \"ReTReK\" that integrates the knowledge as adjustable parameters into an evaluation for promising search directions. Experimental results showed that ReTReK successfully searched synthetic routes based on the specified retrosynthesis knowledge, and the results indicated that the synthetic routes searched with the knowledge were preferred to those without knowledge. The concept of integrating retrosynthesis knowledge as adjustable parameters into data-driven CASP applications is expected to contribute to further their development and spread them to chemists widely.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv.13386092.v1",
+  "keywords": [
+    "retrosynthesis route metrics",
+    "benchmarking",
+    "route metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "retrosynthesis route metrics"
+}

@@ -1,0 +1,25 @@
+{
+  "doi": "10.1007/s11696-025-04388-8",
+  "title": "SE-MCTS: a similarity-based multi-step retrosynthesis route planning model",
+  "authors": [
+    "Cancan Ji",
+    "Xiangsheng Huang",
+    "Jia Ao",
+    "Wei Dai"
+  ],
+  "year": 2026,
+  "journal": "Chemical Papers",
+  "abstract": "",
+  "link": "https://link.springer.com/content/pdf/10.1007/s11696-025-04388-8.pdf",
+  "keywords": [
+    "multi-step retrosynthesis evaluation metrics",
+    "benchmarking",
+    "route metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "multi-step retrosynthesis evaluation metrics"
+}

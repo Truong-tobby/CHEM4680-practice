@@ -1,0 +1,22 @@
+{
+  "doi": "10.23880/ppej-16000252",
+  "title": "Evaluation of Relative Permeability Tests One-Step with Bump Flow and Multi-Step",
+  "authors": [],
+  "year": 2021,
+  "journal": "Petroleum &amp; Petrochemical Engineering Journal",
+  "abstract": "The relative permeability curves obtained in the laboratory are used in reservoir simulators to predict production and decide the best strategies for an oil field. Therefore, researchers are studying several procedures to obtain relative permeability curves, among them the multiple flow rates injection methods. Thus, this work proposes to develop an experimental procedure with multiple increasing flows (multi-step). To make this feasible, simulations were initially carried out at CYDAR, aiming to establish the flow rates and necessary the time to system stabilization, within the limits of the equipment. After that, the tests were carried out and the results obtained were the minimum time of 5 hours to stabilize the oil production and the differential pressure at each flow rate. The accounting and minimization of the capillary end effect in these tests were also evaluated. And the capillary pressure constraints contributed to minimize the number of possible solutions of the optimization problem improving the uniqueness of solution.",
+  "link": "",
+  "keywords": [
+    "multi-step retrosynthesis evaluation metrics",
+    "benchmarking",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "multi-step retrosynthesis evaluation metrics"
+}

@@ -1,0 +1,25 @@
+{
+  "doi": "10.26434/chemrxiv.14345729.v1",
+  "title": "Materials Precursor Score: Modelling Chemists' Intuition for the Synthetic Accessibility of Porous Organic Cages",
+  "authors": [
+    "Steven Bennett",
+    "Filip Szczypiński",
+    "Lukas Turcani",
+    "Michael Briggs",
+    "Rebecca L. Greenaway",
+    "Kim Jelfs"
+  ],
+  "year": 2021,
+  "journal": "",
+  "abstract": "Computation is increasingly being used to try to accelerate the discovery of new materials. One specific example of this is porous molecular materials, specifically porous organic cages, where the porosity of the materials predominantly comes from the internal cavities of the molecules themselves. The computational discovery of novel structures with useful properties is currently hindered by the difficulty in transitioning from a computational prediction to synthetic realisation. Attempts at experimental validation are often time-consuming, expensive and, frequently, the key bottleneck of material discovery. In this work, we developed a computational screening workflow for porous molecules that includes consideration of the synthetic difficulty of material precursors, aimed at easing the transition between computational prediction and experimental realisation. We trained a machine learning model by first collecting data on 12,553 molecules categorised either as `easy-to-synthesise' or `difficult-to-synthesise' by expert chemists with years of experience in organic synthesis. We used an approach to address the class imbalance present in our dataset, producing a binary classifier able to categorise easy-to-synthesise molecules with few false positives. We then used our model during computational screening for porous organic molecules to bias towards precursors whose easier synthesis requirements would make them promising candidates for experimental realisation and material development. We found that even by limiting precursors to those that are easier-to-synthesise, we are still able to identify cages with favourable, and even some rare, properties.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv.14345729.v1",
+  "keywords": [
+    "synthetic accessibility score retrosynthesis",
+    "accessibility"
+  ],
+  "tags": [
+    "accessibility"
+  ],
+  "source": "crossref",
+  "query_hit": "synthetic accessibility score retrosynthesis"
+}

@@ -1,0 +1,22 @@
+{
+  "doi": "10.5194/egusphere-egu26-11034",
+  "title": "Study of the step-path failure mechanism of rock slope based on crack coalescence modes",
+  "authors": [
+    "Lei Zhu"
+  ],
+  "year": 2026,
+  "journal": "",
+  "abstract": "The crack propagation and coalescence mode play an important role in the step-path failure mechanism of rock slope. This study uses the discrete element method (DEM) to simulate the modes of crack coalescence in rock. Initially, coalescence modes between two pre-existing cracks with different geometries (rock bridge angle) and confining stress under biaxial compression were performed. Several modes and their dependence on conditions were observed. During the tests, wing cracks and secondary cracks have been identified, which manifested as tensile and shear cracks in a plane coplanar with the pre-existing cracks. Particularly, the secondary cracks can be either shear or tensile cracks depending on its geometries and confining stress, and they progressively transition from tensile to shear with the increase of confining stress. The wing cracks always occurred under a low confining stress biaxial compression and almost disappeared under a high confining stress. In addition, confining stress can influence on the crack coalescence modes dramatically. Therefore, a set of extended coalescence modes has been proposed to analyze interactions among multiple flaws, demonstrating that the crack coalescence preferentially occurs between the pair of flaws associated with low coalescence stress. Finally, a rock slope case was conducted to elucidate the step-path failure mechanism. The results show that joint coalescence initiates at the slope toe and subsequently propagates upward. Distinct coalescence modes, governed by the local stress conditions within the slope, control the development and irregularity of the failure surface.",
+  "link": "",
+  "keywords": [
+    "failure modes one-step retrosynthesis",
+    "failure modes",
+    "single-step metrics"
+  ],
+  "tags": [
+    "failure modes",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "failure modes one-step retrosynthesis"
+}

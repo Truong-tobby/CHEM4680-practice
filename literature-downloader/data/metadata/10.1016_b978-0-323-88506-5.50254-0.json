@@ -1,0 +1,23 @@
+{
+  "doi": "10.1016/b978-0-323-88506-5.50254-0",
+  "title": "Waste- to-DME: Process Synthesis and Sustainability Evaluation",
+  "authors": [
+    "Lefu A. Litheko",
+    "Bilal Patel"
+  ],
+  "year": 2021,
+  "journal": "Computer Aided Chemical Engineering",
+  "abstract": "",
+  "link": "https://api.elsevier.com/content/article/PII:B9780323885065502540?httpAccept=text/xml",
+  "keywords": [
+    "computer-aided synthesis planning evaluation",
+    "benchmarking",
+    "route metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "computer-aided synthesis planning evaluation"
+}

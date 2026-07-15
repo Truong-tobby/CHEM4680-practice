@@ -1,0 +1,26 @@
+{
+  "doi": "10.3390/s21113828",
+  "title": "Accuracy in WiFi Access Point Position Estimation Using Round Trip Time",
+  "authors": [
+    "Miquel Garcia-Fernandez",
+    "Isaac Hoyas-Ester",
+    "Alex Lopez-Cruces",
+    "Malgorzata Siutkowska",
+    "Xavier Banqué-Casanovas"
+  ],
+  "year": 2021,
+  "journal": "Sensors",
+  "abstract": "WiFi Round Trip Time (RTT) unlocks meter level accuracies in user terminal positions where no other navigation systems, such as Global Navigation Satellite Systems (GNSS), are able to (e.g., indoors). However, little has been done so far to obtain a scalable and automated system that computes the position of the WiFi Access Points (WAP) using RTT and that is able to estimate, in addition to the position, the hardware biases that offset the WiFi ranging measurements. These biases have a direct impact on the ultimate position accuracy of the terminals. This work proposes a method in which the computation of the WiFi Access Points positions and hardware biases (i.e., products) can be estimated based on the ranges and position fixes provided by user terminals (i.e., inverse positioning) and details how this can be improved if raw GNSS measurements (pseudoranges and carrier phase) are also available in the terminal. The data setup used to obtain a performance assessment was configured in a benign scenario (open sky with no obstructions) in order to obtain an upper boundary on the positioning error that can be achieved with the proposed method. Under these conditions, accuracies better than 1.5 m were achieved for the WAP position and hardware bias. The proposed method is suitable to be implemented in an automated manner, without having to rely on dedicated campaigns to survey 802.11mc-compliant WAPs. This paper offers a technique to automatically estimate both mild-indoor WAP products (where terminals have both Wi-Fi RTT and GNSS coverage) and deep-indoor WAP (with no GNSS coverage where the terminals obtain their position exclusively from previously estimated mild-indoor WAPs).",
+  "link": "https://www.mdpi.com/1424-8220/21/11/3828/pdf",
+  "keywords": [
+    "round-trip accuracy retrosynthesis",
+    "coverage diversity",
+    "single-step metrics"
+  ],
+  "tags": [
+    "coverage diversity",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "round-trip accuracy retrosynthesis"
+}

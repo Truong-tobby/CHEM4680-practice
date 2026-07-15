@@ -1,0 +1,23 @@
+{
+  "doi": "10.1071/ch20371",
+  "title": "The Future of Retrosynthesis and Synthetic Planning: Algorithmic, Humanistic or the Interplay?",
+  "authors": [
+    "Craig M. Williams",
+    "Madeleine A. Dallaston"
+  ],
+  "year": 2021,
+  "journal": "Australian Journal of Chemistry",
+  "abstract": "The practice of deploying and teaching retrosynthesis is on the cusp of considerable change, which in turn forces practitioners and educators to contemplate whether this impending change will advance or erode the efficiency and elegance of organic synthesis in the future. A short treatise is presented herein that covers the concept of retrosynthesis, along with exemplified methods and theories, and an attempt to comprehend the impact of artificial intelligence in an era when freely and commercially available retrosynthetic and forward synthesis planning programs are increasingly prevalent. Will the computer ever compete with human retrosynthetic design and the art of organic synthesis?",
+  "link": "https://connectsci.au/ch/article-pdf/74/5/291/724611/ch20371.pdf",
+  "keywords": [
+    "synthetic accessibility score retrosynthesis",
+    "accessibility",
+    "route metrics"
+  ],
+  "tags": [
+    "accessibility",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "synthetic accessibility score retrosynthesis"
+}

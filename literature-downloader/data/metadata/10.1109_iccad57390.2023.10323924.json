@@ -1,0 +1,23 @@
+{
+  "doi": "10.1109/iccad57390.2023.10323924",
+  "title": "Optimal Layout Synthesis for Quantum Circuits as Classical Planning",
+  "authors": [
+    "Irfansha Shaik",
+    "Jaco van de Pol"
+  ],
+  "year": 2023,
+  "journal": "2023 IEEE/ACM International Conference on Computer Aided Design (ICCAD)",
+  "abstract": "",
+  "link": "http://xplorestaging.ieee.org/ielx7/10323590/10323543/10323924.pdf?arnumber=10323924",
+  "keywords": [
+    "computer-aided synthesis planning evaluation",
+    "benchmarking",
+    "route metrics"
+  ],
+  "tags": [
+    "benchmarking",
+    "route metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "computer-aided synthesis planning evaluation"
+}

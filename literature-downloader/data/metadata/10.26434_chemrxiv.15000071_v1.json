@@ -1,0 +1,28 @@
+{
+  "doi": "10.26434/chemrxiv.15000071/v1",
+  "title": "Quantifying the Failure Modes of Current One-step Retrosynthesis Models",
+  "authors": [
+    "Suong B A Tran",
+    "Jihye Roh",
+    "Connor W Coley"
+  ],
+  "year": 2026,
+  "journal": "",
+  "abstract": "Computer-aided synthesis planning (CASP) automates retrosynthetic analysis, generally by recursively applying one-step retrosynthesis models within multistep search algorithms to simplify a target molecule into commercially available starting materials. Despite their utility, these tools often fail to recover literature-reported pathways. Such failures arise from two causes: either (i) the literature-reported precursor is not proposed at all or (ii) it is proposed but ranked too low to be discovered during multistep search. In this work, we quantify the challenges that data-driven one-step retrosynthesis models face in reproducing the reported precursors. We first evaluate model performance using standard top- k exact-match accuracy and stratify this accuracy by product and reaction complexity, demonstrating a decrease in performance with increasing complexity. This decline is accompanied by a systematic underprediction of the number of reacting atoms and changing rings, indicating a bias toward simpler transformations, even when complex examples are included in the training data. To gain deeper insights into failure modes, we evaluate models with complementary metrics that account for incorrect stereochemistry, leaving groups, and multi-stage reactions. Overall, our work provides a quantitative analysis of how one-step retrosynthesis models fail to capture literature-reported reactions and highlights opportunities for improving future models.",
+  "link": "https://chemrxiv.org/doi/pdf/10.26434/chemrxiv.15000071/v1",
+  "keywords": [
+    "failure modes one-step retrosynthesis",
+    "accessibility",
+    "failure modes",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "tags": [
+    "accessibility",
+    "failure modes",
+    "route metrics",
+    "single-step metrics"
+  ],
+  "source": "crossref",
+  "query_hit": "failure modes one-step retrosynthesis"
+}

@@ -57,3 +57,9 @@ complete_example_output/
 # OS files
 .DS_Store
 Thumbs.db
+# Literature-ingestion secrets and generated artifacts
+API.txt
+data/raw/
+data/corpus/*.jsonl
+data/corpus/*.recovery
+*.part

@@ -1,0 +1,640 @@
+"""
+DOI discovery utilities for LLM_RAG_V3.
+
+OpenAlex-based discovery for retrosynthesis / CASP evaluation papers.
+CLI entrypoint: scripts/doi_discovery.py → main_openalex().
+"""
+
+from __future__ import annotations
+
+import csv
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Set
+
+import requests
+
+from config import USER_AGENT
+
+try:
+    from tqdm import tqdm  # type: ignore
+except Exception:  # pragma: no cover
+    tqdm = None
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PKG_DIR = Path(__file__).resolve().parent
+# Prefer results/ (existing project layout); fall back to data/.
+RESULTS_JOURNAL_DIR = ROOT / "results" / "journals"
+RESULTS_DOI_DIR = ROOT / "results" / "doi"
+DATA_JOURNAL_DIR = ROOT / "data" / "journals"
+DATA_DOI_DIR = ROOT / "data" / "doi"
+# Actual whitelist shipped with this package (note: folder name is "jornal").
+PKG_WHITELIST_DIR = PKG_DIR / "jornal_whitelist"
+
+OPENALEX_WORKS_URL = "https://api.openalex.org/works"
+
+# ---------------------------------------------------------------------------
+# Search queries (retrosynthesis / CASP evaluation)
+# ---------------------------------------------------------------------------
+
+SEARCH_QUERIES: List[str] = [
+    "single-step retrosynthesis",
+    "round-trip accuracy retrosynthesis",
+    "retrosynthesis coverage diversity",
+    "PaRoutes retrosynthesis",
+    "retrosynthesis benchmarking",
+    "retrosynthesis route metrics",
+    "failure modes one-step retrosynthesis",
+    "computer-aided synthesis planning evaluation",
+    "multi-step retrosynthesis evaluation metrics",
+    "synthetic accessibility score retrosynthesis",
+]
+
+# Strong topical signals used by the classifier.
+RETROSYNTHESIS_POSITIVE_TERMS: List[str] = [
+    "retrosynthesis",
+    "retrosynthetic",
+    "synthesis planning",
+    "computer-aided synthesis",
+    "computer aided synthesis",
+    "casp",
+    "paroutes",
+    "round-trip accuracy",
+    "round trip accuracy",
+    "synthetic accessibility",
+    "single-step retrosynthesis",
+    "single step retrosynthesis",
+    "one-step retrosynthesis",
+    "one step retrosynthesis",
+    "multi-step retrosynthesis",
+    "multistep retrosynthesis",
+    "reaction pathway",
+    "route prediction",
+    "template-based retrosynthesis",
+    "template free retrosynthesis",
+    "template-free retrosynthesis",
+]
+
+RETROSYNTHESIS_RELATED_TERMS: List[str] = [
+    "reaction prediction",
+    "forward synthesis",
+    "backward synthesis",
+    "molecular transformer",
+    "synthesis route",
+    "chemical synthesis planning",
+    "ai-driven synthesis",
+    "machine learning synthesis",
+    "graph-based retrosynthesis",
+    "sa score",
+    "synthetic complexity",
+]
+
+# Clearly off-topic for this search (keep light — avoid over-filtering).
+NOISE_FIELD_TERMS: List[str] = [
+]
+
+# Default focus: publishers we can target with TDM / full-text APIs first.
+DEFAULT_PUBLISHER_FILTER: List[str] = ["elsevier", "wiley"]
+
+# DOI prefix hints (used together with publisher name matching).
+_ELSEVIER_DOI_PREFIXES = ("10.1016/",)
+_WILEY_DOI_PREFIXES = ("10.1002/", "10.1111/")
+# because openalex returns all the metadata for the paper,
+# we can use this to filter out the papers that are not relevant to the retrosynthesis
+
+@dataclass
+class OpenAlexWorkRecord:
+    doi: str
+    journal: str
+    publisher: Optional[str]
+    year: Optional[int]
+    work_type: Optional[str]
+    source_query: str
+    category: str  # target_retrosynthesis / target_related
+    title: str = ""
+    abstract: str = ""
+    oa_url: str = ""
+    pdf_url: str = ""
+
+
+def _resolve_journal_dir() -> Path:
+    """Resolve directory containing journal whitelist CSVs."""
+    if PKG_WHITELIST_DIR.exists():
+        return PKG_WHITELIST_DIR
+    if RESULTS_JOURNAL_DIR.exists():
+        return RESULTS_JOURNAL_DIR
+    return DATA_JOURNAL_DIR
+
+
+def _resolve_doi_dir() -> Path:
+    """Always prefer results/doi/ (create on save); fall back only if data/doi exists alone."""
+    if RESULTS_DOI_DIR.exists() or not DATA_DOI_DIR.exists():
+        return RESULTS_DOI_DIR
+    return DATA_DOI_DIR
+
+#Input / Output
+# Input: work — dict JSON một paper từ OpenAlex API
+# Output: (oa_url, pdf_url) — cả hai là str, thiếu thì ""
+# Khi build OpenAlexWorkRecord, rồi ghi vào CSV discovery (oa_url, pdf_url). Downstream, pipeline_core._try_oa_pdf dùng cột pdf_url làm fallback khi Wiley/Elsevier TDM fail.
+# Tóm lại: parse metadata OpenAlex → lấy cặp link OA (landing + PDF) để lưu CSV và
+# dùng tải free PDF sau này nếu Wiley/Elsevier TDM fail.
+def _extract_oa_urls(work: Dict) -> tuple:
+    """Return (landing/oa_url, pdf_url) from OpenAlex location fields."""
+    best_oa = work.get("best_oa_location") or {}
+    primary = work.get("primary_location") or {}
+
+    pdf_url = (
+        best_oa.get("pdf_url")
+        or primary.get("pdf_url")
+        or ""
+    )
+    oa_url = (
+        best_oa.get("landing_page_url")
+        or primary.get("landing_page_url")
+        or ""
+    )
+    return oa_url or "", pdf_url or ""
+
+
+def _work_to_record(work: Dict, source_query: str, category: str, fallback_journal: str = "") -> OpenAlexWorkRecord:
+    publisher, journal_name = _extract_publisher_journal(
+        work, fallback_journal=fallback_journal
+    )
+    oa_url, pdf_url = _extract_oa_urls(work)
+    return OpenAlexWorkRecord(
+        doi=work.get("doi") or "",
+        journal=journal_name,
+        publisher=publisher,
+        year=work.get("publication_year"),
+        work_type=work.get("type"),
+        source_query=source_query,
+        category=category,
+        title=(work.get("title") or "").strip(),
+        abstract=_reconstruct_abstract(work.get("abstract_inverted_index")),
+        oa_url=oa_url,
+        pdf_url=pdf_url,
+    )
+
+
+def _reconstruct_abstract(inverted_index: Optional[Dict]) -> str:
+    if not inverted_index:
+        return ""
+    word_index = []
+    for k, v in inverted_index.items():
+        for index in v:
+            word_index.append((k, index))
+    word_index.sort(key=lambda x: x[1])
+    return " ".join([w for w, _ in word_index])
+
+
+def _classify_openalex_work(work: Dict, source_query: str) -> str:
+    """
+    Classify an OpenAlex work for retrosynthesis / CASP relevance.
+
+    Returns one of:
+        - "target_retrosynthesis" : clear retrosynthesis / CASP evaluation paper
+        - "target_related"        : closely related synthesis-planning / metrics
+        - "noise_field"           : clearly off-topic
+        - "unknown_context"       : no usable topical signal
+    """
+    title = (work.get("title") or "").lower()
+    abstract = _reconstruct_abstract(work.get("abstract_inverted_index")).lower()
+    concepts = [c.get("display_name", "").lower() for c in work.get("concepts") or []]
+    query_l = (source_query or "").lower()
+    full_text = f"{title} {abstract} {' '.join(concepts)} {query_l}"
+
+    # Off-topic domains without retrosynthesis language.
+    if any(k in full_text for k in NOISE_FIELD_TERMS):
+        if not any(t in full_text for t in RETROSYNTHESIS_POSITIVE_TERMS):
+            return "noise_field"
+
+    if any(t in full_text for t in RETROSYNTHESIS_POSITIVE_TERMS):
+        return "target_retrosynthesis"
+
+    # Query tokens often appear even when wording differs slightly.
+    query_tokens = [tok for tok in query_l.replace('"', "").split() if len(tok) > 3]
+    hit_tokens = sum(1 for tok in query_tokens if tok in full_text)
+    if hit_tokens >= max(2, len(query_tokens) // 2):
+        return "target_retrosynthesis"
+
+    if any(t in full_text for t in RETROSYNTHESIS_RELATED_TERMS):
+        return "target_related"
+
+    return "unknown_context"
+
+
+def _extract_publisher_journal(work: Dict, fallback_journal: str = "") -> tuple:
+    primary_loc = work.get("primary_location") or {}
+    source = primary_loc.get("source") or {}
+
+    publisher = source.get("host_organization_name")
+    if not publisher:
+        publisher = source.get("publisher")
+    if not publisher:
+        host_venue = work.get("host_venue") or {}
+        publisher = host_venue.get("publisher")
+
+    if isinstance(publisher, list):
+        publisher = "; ".join([str(p).strip() for p in publisher if p])
+    publisher = publisher or ""
+
+    journal_name = source.get("display_name") or fallback_journal
+    return publisher, journal_name
+
+
+def _normalize_doi_for_match(doi: str) -> str:
+    d = (doi or "").strip().lower()
+    for prefix in (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+    ):
+        if d.startswith(prefix):
+            d = d[len(prefix) :]
+            break
+    return d
+
+
+def _matches_publisher_filter(
+    publisher: Optional[str],
+    doi: str,
+    allowed: Optional[Iterable[str]],
+) -> bool:
+    """
+    Return True if the work matches the allowed publisher set.
+
+    Matching uses publisher name substrings and common DOI prefixes
+    (10.1016 → Elsevier, 10.1002/10.1111 → Wiley).
+    """
+    if not allowed:
+        return True
+
+    allowed_set = {a.strip().lower() for a in allowed if a and a.strip()}
+    if not allowed_set or "all" in allowed_set:
+        return True
+
+    pub = (publisher or "").lower()
+    doi_n = _normalize_doi_for_match(doi)
+
+    if "elsevier" in allowed_set:
+        if "elsevier" in pub or doi_n.startswith(_ELSEVIER_DOI_PREFIXES):
+            return True
+    if "wiley" in allowed_set:
+        if "wiley" in pub or doi_n.startswith(_WILEY_DOI_PREFIXES):
+            return True
+
+    # Generic: any other allowed token must appear in publisher name.
+    for token in allowed_set - {"elsevier", "wiley"}:
+        if token and token in pub:
+            return True
+    return False
+
+
+def _build_openalex_filter(
+    issn: Optional[str] = None,
+    from_year: str = "2000-01-01",
+) -> str:
+    components = [
+        "has_doi:true",
+        "has_abstract:true",
+        f"from_publication_date:{from_year}",
+        "type:article|review",
+    ]
+    if issn:
+        components.append(f"primary_location.source.issn:{issn}")
+    return ",".join(components)
+
+
+def _iterate_openalex(
+    query: str,
+    *,
+    issn: Optional[str] = None,
+    max_works: int = 500,
+) -> Iterable[Dict]:
+    """
+    Iterate OpenAlex works for a query, optionally restricted to one ISSN.
+    """
+    per_page = 200
+    cursor = "*"
+    fetched = 0
+
+    params_base = {
+        "search": query,
+        "filter": _build_openalex_filter(issn=issn),
+        "per-page": str(per_page),
+    }
+
+    while True:
+        params = dict(params_base)
+        params["cursor"] = cursor
+        resp = requests.get(
+            OPENALEX_WORKS_URL,
+            params=params,
+            timeout=60,
+            headers={"User-Agent": USER_AGENT},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("results") or []
+        if not results:
+            break
+
+        for w in results:
+            yield w
+            fetched += 1
+            if fetched >= max_works:
+                return
+
+        cursor = data.get("meta", {}).get("next_cursor")
+        if not cursor:
+            break
+
+
+def _load_whitelist_for_openalex(path: Path) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    if not path.exists():
+        raise FileNotFoundError(f"Whitelist file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("selected", "").strip().lower() != "true":
+                continue
+            name = (row.get("journal_name") or "").strip()
+            issn = (row.get("issn") or "").strip()
+            if not name or not issn:
+                continue
+            rows.append({"journal_name": name, "issn": issn})
+    return rows
+
+
+def discover_dois_openalex_global(
+    queries: Optional[List[str]] = None,
+    max_works_per_query: int = 500,
+    publishers: Optional[List[str]] = None,
+) -> List[OpenAlexWorkRecord]:
+    """
+    Discover DOIs via OpenAlex search across all sources (no journal filter).
+
+    publishers: optional allow-list (e.g. ["elsevier", "wiley"]). None/empty = all.
+    """
+    query_list = queries or SEARCH_QUERIES
+    allowed = publishers if publishers is not None else list(DEFAULT_PUBLISHER_FILTER)
+    records: List[OpenAlexWorkRecord] = []
+    seen_dois: Set[str] = set()
+
+    query_iter: Iterable[str]
+    if tqdm is not None:
+        query_iter = tqdm(query_list, desc="OpenAlex global queries", unit="query")
+    else:
+        query_iter = query_list
+
+    for q in query_iter:
+        print(f"[INFO] OpenAlex global search: '{q}'")
+        try:
+            for work in _iterate_openalex(q, issn=None, max_works=max_works_per_query):
+                doi = work.get("doi")
+                if not doi:
+                    continue
+                doi_key = doi.lower().strip()
+                if doi_key in seen_dois:
+                    continue
+
+                category = _classify_openalex_work(work, q)
+                if category not in ("target_retrosynthesis", "target_related"):
+                    continue
+
+                publisher, _ = _extract_publisher_journal(work)
+                if not _matches_publisher_filter(publisher, doi, allowed):
+                    continue
+
+                seen_dois.add(doi_key)
+                records.append(_work_to_record(work, q, category))
+        except Exception as exc:
+            print(f"[WARN] OpenAlex global query failed for '{q}': {exc}")
+            continue
+
+        time.sleep(0.5)
+
+    print(
+        f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (global)"
+        f" [publishers={allowed or 'all'}]."
+    )
+    return records
+
+
+def discover_dois_openalex_from_whitelist(
+    whitelist_csv: Path,
+    queries: Optional[List[str]] = None,
+    max_works_per_query: int = 300,
+    publishers: Optional[List[str]] = None,
+) -> List[OpenAlexWorkRecord]:
+    """
+    Discover DOIs from journals in a whitelist CSV using OpenAlex.
+    """
+    journals = _load_whitelist_for_openalex(whitelist_csv)
+    query_list = queries or SEARCH_QUERIES
+    allowed = publishers if publishers is not None else list(DEFAULT_PUBLISHER_FILTER)
+
+    records: List[OpenAlexWorkRecord] = []
+    seen_dois: Set[str] = set()
+
+    journal_iter: Iterable[Dict[str, str]]
+    if tqdm is not None:
+        journal_iter = tqdm(
+            journals,
+            desc="OpenAlex DOI discovery (whitelist)",
+            unit="journal",
+        )
+    else:
+        journal_iter = journals
+
+    for j in journal_iter:
+        jname = j["journal_name"]
+        issn = j["issn"]
+
+        for q in query_list:
+            try:
+                for work in _iterate_openalex(
+                    q, issn=issn, max_works=max_works_per_query
+                ):
+                    doi = work.get("doi")
+                    if not doi:
+                        continue
+                    doi_key = doi.lower().strip()
+                    if doi_key in seen_dois:
+                        continue
+
+                    category = _classify_openalex_work(work, q)
+                    if category not in ("target_retrosynthesis", "target_related"):
+                        continue
+
+                    publisher, _ = _extract_publisher_journal(
+                        work, fallback_journal=jname
+                    )
+                    if not _matches_publisher_filter(publisher, doi, allowed):
+                        continue
+
+                    seen_dois.add(doi_key)
+                    records.append(
+                        _work_to_record(work, q, category, fallback_journal=jname)
+                    )
+            except Exception as exc:
+                print(f"[WARN] OpenAlex query failed for {jname} / '{q}': {exc}")
+                continue
+
+            time.sleep(0.5)
+
+    print(
+        f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (whitelist)"
+        f" [publishers={allowed or 'all'}]."
+    )
+    return records
+
+
+def save_openalex_records(records: List[OpenAlexWorkRecord], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "doi",
+                "title",
+                "abstract",
+                "publisher",
+                "journal",
+                "pub_year",
+                "work_type",
+                "oa_url",
+                "pdf_url",
+                "source_query",
+                "type",
+                "source",
+            ]
+        )
+        for r in records:
+            writer.writerow(
+                [
+                    r.doi,
+                    r.title,
+                    r.abstract,
+                    r.publisher or "",
+                    r.journal,
+                    r.year if r.year is not None else "",
+                    r.work_type or "",
+                    r.oa_url,
+                    r.pdf_url,
+                    r.source_query,
+                    r.category,
+                    "openalex",
+                ]
+            )
+
+
+def main_openalex(
+    use_whitelist: bool = False,
+    publishers: Optional[List[str]] = None,
+) -> None:
+    """
+    CLI entry for OpenAlex-based discovery.
+
+    Default: global OpenAlex search over SEARCH_QUERIES, restricted to
+    Elsevier + Wiley (see DEFAULT_PUBLISHER_FILTER).
+    Set use_whitelist=True to restrict to journal_whitelist_retrosynthesis.csv.
+    Pass publishers=["all"] (or empty after CLI --all-publishers) for no filter.
+    """
+    journal_dir = _resolve_journal_dir()
+    doi_dir = RESULTS_DOI_DIR  # always write under results/doi/
+    doi_dir.mkdir(parents=True, exist_ok=True)
+
+    if publishers is None:
+        publishers = list(DEFAULT_PUBLISHER_FILTER)
+    if publishers == ["all"]:
+        publishers = []
+
+    print(
+        f"[INFO] Publisher filter: {publishers if publishers else 'all publishers'}"
+    )
+
+    if use_whitelist:
+        whitelist_path = journal_dir / "journal_whitelist_retrosynthesis.csv"
+        if not whitelist_path.exists():
+            # Fall back to legacy name if present.
+            alt = journal_dir / "journal_whitelist_ooir_filtered.csv"
+            whitelist_path = alt if alt.exists() else whitelist_path
+        print(f"[INFO] Using journal whitelist: {whitelist_path}")
+        records = discover_dois_openalex_from_whitelist(
+            whitelist_path, publishers=publishers
+        )
+    else:
+        print("[INFO] Using global OpenAlex search (no journal ISSN filter).")
+        records = discover_dois_openalex_global(publishers=publishers)
+
+    if publishers == list(DEFAULT_PUBLISHER_FILTER) or set(publishers) == {
+        "elsevier",
+        "wiley",
+    }:
+        out_path = doi_dir / "doi_list_seed_elsevier_wiley.csv"
+    else:
+        out_path = doi_dir / "doi_list_seed_retrosynthesis.csv"
+    save_openalex_records(records, out_path)
+    print(f"[INFO] Saved OpenAlex DOI seed list to {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# Built-in TDM test DOIs (smoke tests for download pipeline)
+# ---------------------------------------------------------------------------
+
+TDM_TEST_DOIS: List[Dict[str, str]] = [
+    {"doi": "10.1016/j.pecs.2019.03.002", "publisher": "Elsevier"},
+    {"doi": "10.1016/j.pecs.2020.100846", "publisher": "Elsevier"},
+    {"doi": "10.1007/s41918-019-00054-2", "publisher": "Springer"},
+    {"doi": "10.1007/s41918-021-00101-x", "publisher": "Springer"},
+    {"doi": "10.1002/adma.202401505", "publisher": "Wiley"},
+    {"doi": "10.1002/adma.202403191", "publisher": "Wiley"},
+    {
+        "doi": "10.1021/acsenergylett.4c01999",
+        "publisher": "American Chemical Society",
+    },
+    {
+        "doi": "10.1021/acsenergylett.4c00790",
+        "publisher": "American Chemical Society",
+    },
+    {"doi": "10.1039/a707503k", "publisher": "Royal Society of Chemistry"},
+    {"doi": "10.1039/b612600f", "publisher": "Royal Society of Chemistry"},
+    {"doi": "10.1039/d2cs00873d", "publisher": "Royal Society of Chemistry"},
+    {
+        "doi": "10.3390/antiox9040336",
+        "publisher": "Multidisciplinary Digital Publishing Institute",
+    },
+    {
+        "doi": "10.3390/antiox9070575",
+        "publisher": "Multidisciplinary Digital Publishing Institute",
+    },
+    {"doi": "10.1155/2011/967307", "publisher": "Hindawi"},
+    {"doi": "10.1155/2016/4283696", "publisher": "Hindawi"},
+    {"doi": "10.1007/978-981-99-1350-3_4", "publisher": "Springer Nature"},
+    {"doi": "10.1007/978-981-19-6282-0_15", "publisher": "Springer Nature"},
+    {
+        "doi": "10.1186/s40824-023-00454-y",
+        "publisher": "American Association for the Advancement of Science",
+    },
+    {
+        "doi": "10.34133/bmr.0251",
+        "publisher": "American Association for the Advancement of Science",
+    },
+    {"doi": "10.1515/nanoph-2017-0044", "publisher": "De Gruyter"},
+    {"doi": "10.1515/nanoph-2020-0013", "publisher": "De Gruyter"},
+    {
+        "doi": "10.1073/pnas.2020357118",
+        "publisher": "National Academy of Sciences",
+    },
+    {
+        "doi": "10.1073/pnas.1401033111",
+        "publisher": "National Academy of Sciences",
+    },
+]

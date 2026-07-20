@@ -1,12 +1,9 @@
-# Retrosynthesis Metrics Literature RAG Explorer
+# Retrosynthesis Literature: Discover → Download → Parse
 
-> **Goal:** Build a small system to (1) automatically search and download paper metadata on *retrosynthesis metrics* via Crossref, (2) store them as a structured mini-corpus, and (3) use RAG for Q&A on metric definitions and comparisons.
-
----
-
-## High-level architecture
+Pipeline for collecting paper full text as structured JSON (for later RAG).
 
 ```text
+<<<<<<< Updated upstream
 ┌──────────────────────────────────────────────────────────────┐
 │  Part 1 — Literature Data Mining (Crossref)                  │
 │  query keywords → /works → metadata + TDM links             │
@@ -274,4 +271,74 @@ Pipeline:
 
 ```bash
 python -m rag.pipeline --metric "round-trip accuracy"
+=======
+1) Find DOIs (Elsevier + Wiley)
+2) Download full text (publisher TDM API first → OA → Crossref)
+3) Parse → parsed/*.json  (ready for RAG later)
+```
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+copy API.txt.example API.txt
+```
+
+Edit `API.txt`:
+
+- `elsevier:` — Article API key with **full-text / TDM entitlement** (plain keys often 403)
+- `wiley:` — **Wiley TDM Client Token** (required for Wiley API downloads)
+
+## Step 1 — Discover DOIs
+
+```bash
+# default: Elsevier + Wiley only
+python literature_mining/run_doi_discovery.py
+
+# all publishers
+python literature_mining/run_doi_discovery.py --all-publishers
+```
+
+Output: `results/doi/doi_list_seed_elsevier_wiley.csv`  
+Columns: `doi`, `title`, `abstract`, `publisher`, `journal`, `oa_url`, `pdf_url`, …
+
+## Step 2 — Download + parse (API-first)
+
+```bash
+# Elsevier/Wiley TDM API → OpenAlex pdf_url → Crossref PDF
+python literature_mining/run_download_parse.py
+
+# learn API only (no OA/Crossref fallback)
+python literature_mining/run_download_parse.py --api-only --limit 5
+
+# stop after N successes (default 100); 0 = no cap
+python literature_mining/run_download_parse.py --target-success 100
+```
+
+| Path | Contents |
+|------|----------|
+| `raw/elsevier/xml/` | Elsevier API XML |
+| `raw/wiley/pdf/` | Wiley TDM PDF |
+| `raw/oa/pdf/` | OpenAlex OA PDF fallback |
+| `parsed/` | Parsed JSON (sections / paragraphs) |
+| `results/doi/download_report.csv` | status + **download_method** |
+
+`download_method` values: `elsevier_api`, `wiley_tdm`, `oa_pdf`, `crossref_pdf`, `skipped_exists`, `failed`.
+
+## Access limits
+
+Publisher APIs need real TDM entitlements. If the API returns 403 / missing key, the default pipeline falls back to OA `pdf_url` then Crossref (unless `--api-only`).
+
+## Project layout
+
+```text
+literature_mining/
+  run_doi_discovery.py   # Step 1
+  run_download_parse.py  # Step 2 (+ parse)
+  doi_discovery.py
+  publisher_tdm.py
+  parsers.py
+  pipeline_core.py
+  config.py
+>>>>>>> Stashed changes
 ```

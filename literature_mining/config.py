@@ -15,9 +15,10 @@ CONTACT_EMAIL = "qtle@connect.ust.hk"
 USER_AGENT = f"Retrosynthesis search (mailto:{CONTACT_EMAIL})"
 
 # Default SiliconFlow OpenAI-compatible base URL
-SILICONFLOW_BASE_URL = os.environ.get(
-    "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1"
-)
+#SILICONFLOW_BASE_URL = os.environ.get(
+#    "SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1"
+#SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
+#)
 
 
 def load_api_keys(path: str = API_TXT_PATH) -> Dict[str, str]:
@@ -45,15 +46,15 @@ def load_api_keys(path: str = API_TXT_PATH) -> Dict[str, str]:
     return keys
 
 
-def get_siliconflow_api_key(keys: Dict[str, str]) -> str:
-    """
-    Pick the SiliconFlow API key from the loaded key dict or environment.
-    """
-    key = keys.get("siliconflow") or os.environ.get("SILICONFLOW_API_KEY", "")
-    if not key:
-        raise RuntimeError(
-            "SiliconFlow API key not found. "
-            "Add a line 'siliconflow:YOUR_SILICONFLOW_API_KEY' to API.txt "
-            "or set the SILICONFLOW_API_KEY environment variable."
-        )
-    return key
+#def get_siliconflow_api_key(keys: Dict[str, str]) -> str:
+#    """
+#    Pick the SiliconFlow API key from the loaded key dict or environment.
+#    """
+#    key = keys.get("siliconflow") or os.environ.get("SILICONFLOW_API_KEY", "")
+#    if not key:
+#        raise RuntimeError(
+#            "SiliconFlow API key not found. "
+#            "Add a line 'siliconflow:YOUR_SILICONFLOW_API_KEY' to API.txt "
+#            "or set the SILICONFLOW_API_KEY environment variable."
+#        )
+#    return key

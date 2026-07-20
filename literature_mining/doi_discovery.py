@@ -24,11 +24,14 @@ except Exception:  # pragma: no cover
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PKG_DIR = Path(__file__).resolve().parent
 # Prefer results/ (existing project layout); fall back to data/.
 RESULTS_JOURNAL_DIR = ROOT / "results" / "journals"
 RESULTS_DOI_DIR = ROOT / "results" / "doi"
 DATA_JOURNAL_DIR = ROOT / "data" / "journals"
 DATA_DOI_DIR = ROOT / "data" / "doi"
+# Actual whitelist shipped with this package (note: folder name is "jornal").
+PKG_WHITELIST_DIR = PKG_DIR / "jornal_whitelist"
 
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 
@@ -92,6 +95,14 @@ RETROSYNTHESIS_RELATED_TERMS: List[str] = [
 NOISE_FIELD_TERMS: List[str] = [
 ]
 
+# Default focus: publishers we can target with TDM / full-text APIs first.
+DEFAULT_PUBLISHER_FILTER: List[str] = ["elsevier", "wiley"]
+
+# DOI prefix hints (used together with publisher name matching).
+_ELSEVIER_DOI_PREFIXES = ("10.1016/",)
+_WILEY_DOI_PREFIXES = ("10.1002/", "10.1111/")
+# because openalex returns all the metadata for the paper,
+# we can use this to filter out the papers that are not relevant to the retrosynthesis
 
 @dataclass
 class OpenAlexWorkRecord:
@@ -102,18 +113,69 @@ class OpenAlexWorkRecord:
     work_type: Optional[str]
     source_query: str
     category: str  # target_retrosynthesis / target_related
+    title: str = ""
+    abstract: str = ""
+    oa_url: str = ""
+    pdf_url: str = ""
 
 
 def _resolve_journal_dir() -> Path:
+    """Resolve directory containing journal whitelist CSVs."""
+    if PKG_WHITELIST_DIR.exists():
+        return PKG_WHITELIST_DIR
     if RESULTS_JOURNAL_DIR.exists():
         return RESULTS_JOURNAL_DIR
     return DATA_JOURNAL_DIR
 
 
 def _resolve_doi_dir() -> Path:
+    """Always prefer results/doi/ (create on save); fall back only if data/doi exists alone."""
     if RESULTS_DOI_DIR.exists() or not DATA_DOI_DIR.exists():
         return RESULTS_DOI_DIR
     return DATA_DOI_DIR
+
+#Input / Output
+# Input: work — dict JSON một paper từ OpenAlex API
+# Output: (oa_url, pdf_url) — cả hai là str, thiếu thì ""
+# Khi build OpenAlexWorkRecord, rồi ghi vào CSV discovery (oa_url, pdf_url). Downstream, pipeline_core._try_oa_pdf dùng cột pdf_url làm fallback khi Wiley/Elsevier TDM fail.
+# Tóm lại: parse metadata OpenAlex → lấy cặp link OA (landing + PDF) để lưu CSV và
+# dùng tải free PDF sau này nếu Wiley/Elsevier TDM fail.
+def _extract_oa_urls(work: Dict) -> tuple:
+    """Return (landing/oa_url, pdf_url) from OpenAlex location fields."""
+    best_oa = work.get("best_oa_location") or {}
+    primary = work.get("primary_location") or {}
+
+    pdf_url = (
+        best_oa.get("pdf_url")
+        or primary.get("pdf_url")
+        or ""
+    )
+    oa_url = (
+        best_oa.get("landing_page_url")
+        or primary.get("landing_page_url")
+        or ""
+    )
+    return oa_url or "", pdf_url or ""
+
+
+def _work_to_record(work: Dict, source_query: str, category: str, fallback_journal: str = "") -> OpenAlexWorkRecord:
+    publisher, journal_name = _extract_publisher_journal(
+        work, fallback_journal=fallback_journal
+    )
+    oa_url, pdf_url = _extract_oa_urls(work)
+    return OpenAlexWorkRecord(
+        doi=work.get("doi") or "",
+        journal=journal_name,
+        publisher=publisher,
+        year=work.get("publication_year"),
+        work_type=work.get("type"),
+        source_query=source_query,
+        category=category,
+        title=(work.get("title") or "").strip(),
+        abstract=_reconstruct_abstract(work.get("abstract_inverted_index")),
+        oa_url=oa_url,
+        pdf_url=pdf_url,
+    )
 
 
 def _reconstruct_abstract(inverted_index: Optional[Dict]) -> str:
@@ -180,6 +242,56 @@ def _extract_publisher_journal(work: Dict, fallback_journal: str = "") -> tuple:
 
     journal_name = source.get("display_name") or fallback_journal
     return publisher, journal_name
+
+
+def _normalize_doi_for_match(doi: str) -> str:
+    d = (doi or "").strip().lower()
+    for prefix in (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi:",
+    ):
+        if d.startswith(prefix):
+            d = d[len(prefix) :]
+            break
+    return d
+
+
+def _matches_publisher_filter(
+    publisher: Optional[str],
+    doi: str,
+    allowed: Optional[Iterable[str]],
+) -> bool:
+    """
+    Return True if the work matches the allowed publisher set.
+
+    Matching uses publisher name substrings and common DOI prefixes
+    (10.1016 → Elsevier, 10.1002/10.1111 → Wiley).
+    """
+    if not allowed:
+        return True
+
+    allowed_set = {a.strip().lower() for a in allowed if a and a.strip()}
+    if not allowed_set or "all" in allowed_set:
+        return True
+
+    pub = (publisher or "").lower()
+    doi_n = _normalize_doi_for_match(doi)
+
+    if "elsevier" in allowed_set:
+        if "elsevier" in pub or doi_n.startswith(_ELSEVIER_DOI_PREFIXES):
+            return True
+    if "wiley" in allowed_set:
+        if "wiley" in pub or doi_n.startswith(_WILEY_DOI_PREFIXES):
+            return True
+
+    # Generic: any other allowed token must appear in publisher name.
+    for token in allowed_set - {"elsevier", "wiley"}:
+        if token and token in pub:
+            return True
+    return False
 
 
 def _build_openalex_filter(
@@ -263,12 +375,15 @@ def _load_whitelist_for_openalex(path: Path) -> List[Dict[str, str]]:
 def discover_dois_openalex_global(
     queries: Optional[List[str]] = None,
     max_works_per_query: int = 500,
+    publishers: Optional[List[str]] = None,
 ) -> List[OpenAlexWorkRecord]:
     """
     Discover DOIs via OpenAlex search across all sources (no journal filter).
-    Best for broad coverage of retrosynthesis / CASP literature.
+
+    publishers: optional allow-list (e.g. ["elsevier", "wiley"]). None/empty = all.
     """
     query_list = queries or SEARCH_QUERIES
+    allowed = publishers if publishers is not None else list(DEFAULT_PUBLISHER_FILTER)
     records: List[OpenAlexWorkRecord] = []
     seen_dois: Set[str] = set()
 
@@ -293,26 +408,22 @@ def discover_dois_openalex_global(
                 if category not in ("target_retrosynthesis", "target_related"):
                     continue
 
-                publisher, journal_name = _extract_publisher_journal(work)
+                publisher, _ = _extract_publisher_journal(work)
+                if not _matches_publisher_filter(publisher, doi, allowed):
+                    continue
+
                 seen_dois.add(doi_key)
-                records.append(
-                    OpenAlexWorkRecord(
-                        doi=doi,
-                        journal=journal_name,
-                        publisher=publisher,
-                        year=work.get("publication_year"),
-                        work_type=work.get("type"),
-                        source_query=q,
-                        category=category,
-                    )
-                )
+                records.append(_work_to_record(work, q, category))
         except Exception as exc:
             print(f"[WARN] OpenAlex global query failed for '{q}': {exc}")
             continue
 
         time.sleep(0.5)
 
-    print(f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (global).")
+    print(
+        f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (global)"
+        f" [publishers={allowed or 'all'}]."
+    )
     return records
 
 
@@ -320,12 +431,14 @@ def discover_dois_openalex_from_whitelist(
     whitelist_csv: Path,
     queries: Optional[List[str]] = None,
     max_works_per_query: int = 300,
+    publishers: Optional[List[str]] = None,
 ) -> List[OpenAlexWorkRecord]:
     """
     Discover DOIs from journals in a whitelist CSV using OpenAlex.
     """
     journals = _load_whitelist_for_openalex(whitelist_csv)
     query_list = queries or SEARCH_QUERIES
+    allowed = publishers if publishers is not None else list(DEFAULT_PUBLISHER_FILTER)
 
     records: List[OpenAlexWorkRecord] = []
     seen_dois: Set[str] = set()
@@ -360,20 +473,15 @@ def discover_dois_openalex_from_whitelist(
                     if category not in ("target_retrosynthesis", "target_related"):
                         continue
 
-                    publisher, journal_name = _extract_publisher_journal(
+                    publisher, _ = _extract_publisher_journal(
                         work, fallback_journal=jname
                     )
+                    if not _matches_publisher_filter(publisher, doi, allowed):
+                        continue
+
                     seen_dois.add(doi_key)
                     records.append(
-                        OpenAlexWorkRecord(
-                            doi=doi,
-                            journal=journal_name,
-                            publisher=publisher,
-                            year=work.get("publication_year"),
-                            work_type=work.get("type"),
-                            source_query=q,
-                            category=category,
-                        )
+                        _work_to_record(work, q, category, fallback_journal=jname)
                     )
             except Exception as exc:
                 print(f"[WARN] OpenAlex query failed for {jname} / '{q}': {exc}")
@@ -382,7 +490,8 @@ def discover_dois_openalex_from_whitelist(
             time.sleep(0.5)
 
     print(
-        f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (whitelist)."
+        f"[INFO] Discovered {len(records)} unique DOIs via OpenAlex (whitelist)"
+        f" [publishers={allowed or 'all'}]."
     )
     return records
 
@@ -394,10 +503,14 @@ def save_openalex_records(records: List[OpenAlexWorkRecord], path: Path) -> None
         writer.writerow(
             [
                 "doi",
+                "title",
+                "abstract",
                 "publisher",
                 "journal",
                 "pub_year",
                 "work_type",
+                "oa_url",
+                "pdf_url",
                 "source_query",
                 "type",
                 "source",
@@ -407,10 +520,14 @@ def save_openalex_records(records: List[OpenAlexWorkRecord], path: Path) -> None
             writer.writerow(
                 [
                     r.doi,
+                    r.title,
+                    r.abstract,
                     r.publisher or "",
                     r.journal,
                     r.year if r.year is not None else "",
                     r.work_type or "",
+                    r.oa_url,
+                    r.pdf_url,
                     r.source_query,
                     r.category,
                     "openalex",
@@ -418,15 +535,30 @@ def save_openalex_records(records: List[OpenAlexWorkRecord], path: Path) -> None
             )
 
 
-def main_openalex(use_whitelist: bool = False) -> None:
+def main_openalex(
+    use_whitelist: bool = False,
+    publishers: Optional[List[str]] = None,
+) -> None:
     """
     CLI entry for OpenAlex-based discovery.
 
-    Default: global OpenAlex search over SEARCH_QUERIES (broad coverage).
+    Default: global OpenAlex search over SEARCH_QUERIES, restricted to
+    Elsevier + Wiley (see DEFAULT_PUBLISHER_FILTER).
     Set use_whitelist=True to restrict to journal_whitelist_retrosynthesis.csv.
+    Pass publishers=["all"] (or empty after CLI --all-publishers) for no filter.
     """
     journal_dir = _resolve_journal_dir()
-    doi_dir = _resolve_doi_dir()
+    doi_dir = RESULTS_DOI_DIR  # always write under results/doi/
+    doi_dir.mkdir(parents=True, exist_ok=True)
+
+    if publishers is None:
+        publishers = list(DEFAULT_PUBLISHER_FILTER)
+    if publishers == ["all"]:
+        publishers = []
+
+    print(
+        f"[INFO] Publisher filter: {publishers if publishers else 'all publishers'}"
+    )
 
     if use_whitelist:
         whitelist_path = journal_dir / "journal_whitelist_retrosynthesis.csv"
@@ -435,12 +567,20 @@ def main_openalex(use_whitelist: bool = False) -> None:
             alt = journal_dir / "journal_whitelist_ooir_filtered.csv"
             whitelist_path = alt if alt.exists() else whitelist_path
         print(f"[INFO] Using journal whitelist: {whitelist_path}")
-        records = discover_dois_openalex_from_whitelist(whitelist_path)
+        records = discover_dois_openalex_from_whitelist(
+            whitelist_path, publishers=publishers
+        )
     else:
         print("[INFO] Using global OpenAlex search (no journal ISSN filter).")
-        records = discover_dois_openalex_global()
+        records = discover_dois_openalex_global(publishers=publishers)
 
-    out_path = doi_dir / "doi_list_seed_retrosynthesis.csv"
+    if publishers == list(DEFAULT_PUBLISHER_FILTER) or set(publishers) == {
+        "elsevier",
+        "wiley",
+    }:
+        out_path = doi_dir / "doi_list_seed_elsevier_wiley.csv"
+    else:
+        out_path = doi_dir / "doi_list_seed_retrosynthesis.csv"
     save_openalex_records(records, out_path)
     print(f"[INFO] Saved OpenAlex DOI seed list to {out_path}")
 

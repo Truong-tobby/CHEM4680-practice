@@ -43,6 +43,12 @@ env/
 venv/
 ENV/
 
+# Secrets and generated literature outputs
+API.txt
+raw/
+parsed/
+results/doi/
+
 # IDE
 .idea/
 .vscode/

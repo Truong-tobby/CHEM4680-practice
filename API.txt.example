@@ -1,0 +1,13 @@
+# Copy this file to API.txt and fill in your keys (API.txt is gitignored).
+# Format: name:value (one per line).
+
+# Elsevier Article Retrieval API (X-ELS-APIKey).
+# Needs full-text / Text Mining entitlement — a bare developer key often returns 403.
+elsevier:YOUR_ELSEVIER_KEY
+
+# Wiley Text & Data Mining client token (Wiley-TDM-Client-Token).
+# Required for download_wiley_pdf; not the same as a website login cookie.
+wiley:YOUR_WILEY_TDM_TOKEN
+
+# Springer Nature Meta API (metadata only — not used for Elsevier/Wiley full-text path).
+spring nature:YOUR_SPRINGER_NATURE_META_KEY
